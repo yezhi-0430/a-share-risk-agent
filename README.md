@@ -4,7 +4,7 @@
 
 ## 当前进度
 
-第 1 天：工程初始化。当前只提供服务健康检查，业务功能将在后续按测试驱动逐步加入。
+第 2 天：已完成股票查询和内存版自选股分组接口。当前数据在服务重启后会清空，第 3 天将接入数据库持久化。
 
 ## 项目原则
 
@@ -30,6 +30,16 @@ uvicorn app.main:app --reload
 - API 文档：<http://127.0.0.1:8000/docs>
 - 健康检查：<http://127.0.0.1:8000/health>
 
+## 当前接口
+
+- `GET /api/v1/stocks?query=600519`：按代码或名称查询股票。
+- `GET /api/v1/watchlists`：列出自选股分组。
+- `POST /api/v1/watchlists`：创建分组。
+- `PATCH /api/v1/watchlists/{id}`：重命名分组。
+- `DELETE /api/v1/watchlists/{id}`：删除分组。
+- `POST /api/v1/watchlists/{id}/items`：向分组添加股票。
+- `DELETE /api/v1/watchlists/{id}/items/{symbol}`：从分组移除股票。
+
 运行检查：
 
 ```powershell
@@ -50,3 +60,4 @@ data/                 可公开的演示数据
 
 - [产品范围与用户故事](docs/product-scope.md)
 - [第一版架构](docs/architecture.md)
+- [第 2 天 FastAPI 学习笔记](docs/day-02-fastapi-notes.md)
