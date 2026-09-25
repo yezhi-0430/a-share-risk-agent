@@ -24,7 +24,7 @@ def test_connects_to_database() -> None:
     with engine.connect() as connection:
         result = connection.execute(text("SELECT current_database()"))
 
-    assert result.scalar_one() == "a_share_risk_agent"
+    assert result.scalar_one() == "a_share_risk_agent_test"
 
 
 def test_database_contains_project_tables() -> None:
@@ -36,3 +36,10 @@ def test_database_contains_project_tables() -> None:
         "watchlists",
         "watchlist_items",
     }.issubset(table_names)
+
+
+def test_tests_use_test_database() -> None:
+    with engine.connect() as connection:
+        result = connection.execute(text("SELECT current_database()"))
+
+    assert result.scalar_one() == "a_share_risk_agent_test"

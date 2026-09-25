@@ -1,18 +1,31 @@
 import logging
+from typing import Annotated
 
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from app.database import SessionLocal
+from app.watchlists.repository import (
+    DuplicateStockInWatchlistError,
+    StockNotInWatchlistError,
+    WatchlistNotFoundError,
+    add_stock_to_watchlist,
+    get_watchlists,
+    remove_stock_from_watchlist,
+)
 from app.watchlists.repository import create_watchlist as save_watchlist
-from app.watchlists.repository import get_watchlists
 
 logger = logging.getLogger(__name__)
 
 
 class CreateWatchlistRequest(BaseModel):
     name: str = Field(min_length=1, max_length=40)
+
+
+class AddStockRequest(BaseModel):
+    symbol: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 
 def create_app() -> FastAPI:
@@ -80,6 +93,59 @@ def create_app() -> FastAPI:
                 }
                 for watchlist in watchlists
             ]
+
+    @application.post(
+        "/api/v1/watchlists/{watchlist_id}/stocks",
+        tags=["watchlists"],
+        status_code=status.HTTP_201_CREATED,
+    )
+    def add_stock(
+        watchlist_id: int,
+        payload: AddStockRequest,
+    ) -> dict[str, str]:
+        with SessionLocal() as session:
+            try:
+                stock = add_stock_to_watchlist(
+                    session,
+                    watchlist_id,
+                    payload.symbol,
+                    payload.name,
+                )
+            except WatchlistNotFoundError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="自选组不存在",
+                ) from exc
+            except DuplicateStockInWatchlistError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="该股票已在自选组中",
+                ) from exc
+
+            return {
+                "symbol": stock.symbol,
+                "name": stock.name,
+            }
+
+    @application.delete(
+        "/api/v1/watchlists/{watchlist_id}/stocks/{symbol}",
+        tags=["watchlists"],
+        status_code=status.HTTP_204_NO_CONTENT,
+    )
+    def remove_stock(watchlist_id: int, symbol: str) -> None:
+        with SessionLocal() as session:
+            try:
+                remove_stock_from_watchlist(session, watchlist_id, symbol)
+            except WatchlistNotFoundError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="自选组不存在",
+                ) from exc
+            except StockNotInWatchlistError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="自选组中不存在该股票",
+                ) from exc
 
     return application
 
