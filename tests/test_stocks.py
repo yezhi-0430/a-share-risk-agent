@@ -2,6 +2,7 @@ import asyncio
 
 import httpx
 
+from app.database import DailyPrice, SessionLocal, Stock
 from app.main import app
 
 
@@ -42,3 +43,103 @@ def test_searches_stocks_by_name() -> None:
             "name": "平安银行",
         }
     ]
+
+def test_import_daily_price(client) -> None:
+        with SessionLocal() as session:
+            session.add(
+                Stock(
+                    symbol="600519.SH",
+                    name="贵州茅台",
+                )
+            )
+            session.commit()
+        response = client.post(
+        "/api/v1/stocks/600519.SH/daily-prices",
+        json={
+            "trade_date": "2026-09-25",
+            "open": "1450.00",
+            "high": "1465.50",
+            "low": "1442.00",
+            "close": "1460.25",
+            "volume": 328900,
+        },
+    )
+
+        assert response.status_code == 201
+        with SessionLocal() as session:
+            daily_price = session.query(DailyPrice).one()
+
+        assert daily_price.trade_date.isoformat() == "2026-09-25"
+        assert str(daily_price.open) == "1450.0000"
+        assert str(daily_price.close) == "1460.2500"
+        assert daily_price.volume == 328900
+
+def test_import_daily_price_returns_404_for_unknown_stock(client) -> None:
+    response = client.post(
+        "/api/v1/stocks/999999.SH/daily-prices",
+        json={
+            "trade_date": "2026-09-25",
+            "open": "10.00",
+            "high": "10.50",
+            "low": "9.80",
+            "close": "10.20",
+            "volume": 100000,
+        },
+    )
+
+    assert response.status_code == 404
+
+def test_import_daily_price_returns_409_when_duplicate(client) -> None:
+    with SessionLocal() as session:
+        session.add(
+            Stock(
+                symbol="600519.SH",
+                name="贵州茅台",
+            )
+        )
+        session.commit()
+
+    payload = {
+        "trade_date": "2026-09-25",
+        "open": "1450.00",
+        "high": "1465.50",
+        "low": "1442.00",
+        "close": "1460.25",
+        "volume": 328900,
+    }
+
+    first_response = client.post(
+        "/api/v1/stocks/600519.SH/daily-prices",
+        json=payload,
+    )
+    second_response = client.post(
+        "/api/v1/stocks/600519.SH/daily-prices",
+        json=payload,
+    )
+
+    assert first_response.status_code == 201
+    assert second_response.status_code == 409
+
+def test_import_daily_price_rejects_negative_volume(client) -> None:
+    with SessionLocal() as session:
+        session.add(
+            Stock(
+                symbol="000001.SZ",
+                name="平安银行",
+            )
+        )
+        session.commit()
+
+    response = client.post(
+        "/api/v1/stocks/000001.SZ/daily-prices",
+        json={
+            "trade_date": "2026-09-25",
+            "open": "10.00",
+            "high": "10.50",
+            "low": "9.80",
+            "close": "10.20",
+            "volume": -1,
+        },
+    )
+
+    assert response.status_code == 422

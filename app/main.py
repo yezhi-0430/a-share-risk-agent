@@ -1,11 +1,15 @@
 import logging
+from datetime import date
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, StringConstraints
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
-from app.database import SessionLocal
+from app.database import DailyPrice, SessionLocal, Stock
 from app.watchlists.repository import (
     DuplicateStockInWatchlistError,
     StockNotInWatchlistError,
@@ -26,6 +30,14 @@ class CreateWatchlistRequest(BaseModel):
 class AddStockRequest(BaseModel):
     symbol: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+class DailyPriceRequest(BaseModel):
+    trade_date: date
+    open: Decimal
+    high: Decimal
+    low: Decimal
+    close: Decimal
+    volume: int = Field(ge=0)
 
 
 def create_app() -> FastAPI:
@@ -51,6 +63,42 @@ def create_app() -> FastAPI:
 
     @application.get("/api/v1/stocks/{symbol}", tags=["stocks"])
     async def get_stock(symbol: str) -> dict[str, str]:
+        return {"symbol": symbol.upper()}
+
+    @application.post("/api/v1/stocks/{symbol}/daily-prices", status_code=201)
+    def import_daily_price(
+    symbol: str,
+    payload: DailyPriceRequest,
+    ):
+        with SessionLocal() as session:
+            stock = session.scalar(
+                select(Stock).where(Stock.symbol == symbol.upper())
+            )
+
+            if stock is None:
+                raise HTTPException(status_code=404, detail="股票不存在")
+
+            daily_price = DailyPrice(
+                stock_id=stock.id,
+                trade_date=payload.trade_date,
+                open=payload.open,
+                high=payload.high,
+                low=payload.low,
+                close=payload.close,
+                volume=payload.volume,
+            )
+
+            session.add(daily_price)
+
+            try:
+                session.commit()
+            except IntegrityError as exc:
+                session.rollback()
+                raise HTTPException(
+                    status_code=409,
+                    detail="该股票当天的日线数据已存在",
+                ) from exc
+
         return {"symbol": symbol.upper()}
 
     @application.get("/api/v1/stocks", tags=["stocks"])

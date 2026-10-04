@@ -1,4 +1,4 @@
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import Integer, Numeric, UniqueConstraint
 
 from app.database import Base
 
@@ -65,3 +65,53 @@ def test_watchlist_item_is_unique_within_watchlist() -> None:
     }
 
     assert ("watchlist_id", "stock_id") in unique_column_sets
+
+
+def test_daily_prices_have_required_columns() -> None:
+    table = Base.metadata.tables["daily_prices"]
+
+    assert set(table.columns.keys()) == {
+        "id",
+        "stock_id",
+        "trade_date",
+        "open",
+        "high",
+        "low",
+        "close",
+        "volume",
+    }
+
+def test_daily_price_is_unique_per_stock_and_date() -> None:
+    table = Base.metadata.tables["daily_prices"]
+
+    unique_column_sets = {
+        tuple(column.name for column in constraint.columns)
+        for constraint in table.constraints
+        if isinstance(constraint, UniqueConstraint)
+    }
+
+    assert ("stock_id", "trade_date") in unique_column_sets
+
+
+def test_daily_price_has_stock_foreign_key() -> None:
+    table = Base.metadata.tables["daily_prices"]
+
+    targets = {
+        foreign_key.target_fullname
+        for foreign_key in table.foreign_keys
+    }
+
+    assert targets == {"stocks.id"}
+
+
+def test_daily_price_uses_numeric_for_prices() -> None:
+    table = Base.metadata.tables["daily_prices"]
+
+    for column_name in ("open", "high", "low", "close"):
+        assert isinstance(table.columns[column_name].type, Numeric)
+
+
+def test_daily_price_uses_integer_for_volume() -> None:
+    table = Base.metadata.tables["daily_prices"]
+
+    assert isinstance(table.columns["volume"].type, Integer)
