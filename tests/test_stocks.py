@@ -1,4 +1,5 @@
 import asyncio
+from datetime import date
 
 import httpx
 
@@ -143,3 +144,67 @@ def test_import_daily_price_rejects_negative_volume(client) -> None:
     )
 
     assert response.status_code == 422
+
+
+def test_get_daily_prices_returns_sorted_data(client) -> None:
+    with SessionLocal() as session:
+        stock = Stock(
+            symbol="600519.SH",
+            name="贵州茅台",
+        )
+        session.add(stock)
+        session.flush()
+
+        session.add_all(
+            [
+                DailyPrice(
+                    stock_id=stock.id,
+                    trade_date=date(2026, 9, 25),
+                    open="1450.00",
+                    high="1465.50",
+                    low="1442.00",
+                    close="1460.25",
+                    volume=328900,
+                ),
+                DailyPrice(
+                    stock_id=stock.id,
+                    trade_date=date(2026, 9, 24),
+                    open="1440.00",
+                    high="1455.00",
+                    low="1435.00",
+                    close="1450.00",
+                    volume=298000,
+                ),
+            ]
+        )
+        session.commit()
+
+    response = client.get("/api/v1/stocks/600519.SH/daily-prices")
+
+    assert response.status_code == 200
+    assert response.json()[0]["trade_date"] == "2026-09-25"
+    assert response.json()[1]["trade_date"] == "2026-09-24"
+
+def test_get_daily_prices_returns_404_for_unknown_stock(client) -> None:
+    response = client.get(
+        "/api/v1/stocks/999999.SH/daily-prices"
+    )
+
+    assert response.status_code == 404
+
+def test_get_daily_prices_returns_empty_list_when_no_data(client) -> None:
+    with SessionLocal() as session:
+        session.add(
+            Stock(
+                symbol="000001.SZ",
+                name="平安银行",
+            )
+        )
+        session.commit()
+
+    response = client.get(
+        "/api/v1/stocks/000001.SZ/daily-prices"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == []

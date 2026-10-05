@@ -101,6 +101,34 @@ def create_app() -> FastAPI:
 
         return {"symbol": symbol.upper()}
 
+    @application.get("/api/v1/stocks/{symbol}/daily-prices")
+    def get_daily_prices(symbol: str) -> list[dict[str, object]]:
+        with SessionLocal() as session:
+            stock = session.scalar(
+                select(Stock).where(Stock.symbol == symbol.upper())
+            )
+
+            if stock is None:
+                raise HTTPException(status_code=404, detail="股票不存在")
+
+            daily_prices = session.scalars(
+                select(DailyPrice)
+                .where(DailyPrice.stock_id == stock.id)
+                .order_by(DailyPrice.trade_date.desc())
+            ).all()
+
+            return [
+                {
+                    "trade_date": item.trade_date.isoformat(),
+                    "open": str(item.open),
+                    "high": str(item.high),
+                    "low": str(item.low),
+                    "close": str(item.close),
+                    "volume": item.volume,
+                }
+                for item in daily_prices
+            ]
+
     @application.get("/api/v1/stocks", tags=["stocks"])
     async def search_stocks(query: str) -> list[dict[str, str]]:
         stocks = [
