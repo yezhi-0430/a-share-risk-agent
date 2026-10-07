@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.database import DailyPrice, SessionLocal, Stock
+from app.risk_api import router as risk_router
 from app.watchlists.repository import (
     DuplicateStockInWatchlistError,
     StockNotInWatchlistError,
@@ -45,6 +46,7 @@ def create_app() -> FastAPI:
         title="A 股自选股风险监控 Agent",
         version="0.1.0",
     )
+    application.include_router(risk_router)
 
     @application.exception_handler(Exception)
     async def handle_unexpected_error(
