@@ -9,7 +9,7 @@
 ## 工具与输入输出
 
 - `calculate_change`：输入 `previous_close`、`current_close`。参数使用 Pydantic 校验为有限且大于零的 `Decimal`；接受 JSON 数字和合法十进制数字字符串，拒绝布尔值、缺失字段和额外字段。价格精度与现有 `Numeric(18, 4)` 行情字段一致，即最多 18 位数字、4 位小数。按 `(current_close - previous_close) / previous_close * 100` 计算，使用 `ROUND_HALF_UP` 保留四位小数，输出 `{"change_percent": "-10.0000"}`。字段单位是百分数，字符串保持小数精度。
-- `get_stock_profile`：输入字符串 `stock_code`，读取本地 `stocks`，返回已保存的股票代码和名称。不得为缺失资料补造行业、财务或官方来源。
+- `get_stock_profile`：输入字符串 `stock_code`，读取本地 `stocks`，返回已保存的股票代码和名称。允许六位数字或六位数字加大写 `.SH`、`.SZ`、`.BJ` 后缀；去除外围空白后精确匹配库中代码，不猜测后缀。不得为缺失资料补造行业、财务或官方来源。
 - `get_daily_prices`：输入 `stock_code`、`start_date`、`end_date`，校验日期有效且开始日期不晚于结束日期；闭区间过滤本地日线，沿用最新交易日在前、价格为字符串的约定。区分股票不存在与股票存在但没有日线。
 
 ## 模块与流程
