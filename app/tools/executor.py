@@ -1,4 +1,6 @@
+import json
 import logging
+from decimal import Decimal
 from time import perf_counter
 from typing import Literal, cast
 
@@ -59,7 +61,8 @@ def execute_tool(
         error = ToolExecutionError(kind="unknown_tool", message="工具未注册")
     else:
         try:
-            validated = model.model_validate_json(arguments)
+            decoded = json.loads(arguments, parse_float=Decimal)
+            validated = model.model_validate(decoded)
             if tool_name == "calculate_change":
                 result = calculate_change(cast(CalculateChangeArguments, validated))
             elif session is not None:
@@ -67,6 +70,10 @@ def execute_tool(
             else:
                 with SessionLocal() as owned_session:
                     result = _run_query(tool_name, validated, owned_session)
+        except json.JSONDecodeError as exc:
+            error = ToolExecutionError(
+                kind="invalid_arguments", message=f"工具参数无效：arguments: {exc.msg}"
+            )
         except ValidationError as exc:
             messages = [
                 f"{'.'.join(str(part) for part in item['loc']) or 'arguments'}: {item['msg']}"

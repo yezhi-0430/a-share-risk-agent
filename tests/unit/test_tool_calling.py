@@ -65,7 +65,14 @@ def test_native_model_request_executes_and_logs_correlated_calculation(
     assert logs == [record.model_dump(mode="json")]
 
 
-@pytest.mark.parametrize("arguments", ['{"previous_close": 0, "current_close": 9}', "{broken"])
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        '{"previous_close": 0, "current_close": 9}',
+        "{broken",
+        '{"previous_close": 10, "current_close": 9.0000000000000001}',
+    ],
+)
 def test_model_bad_arguments_are_recorded_without_calculation(
     stock_session, monkeypatch, arguments
 ):

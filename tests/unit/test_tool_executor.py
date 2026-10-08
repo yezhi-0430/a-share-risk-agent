@@ -41,6 +41,52 @@ def test_records_calculation_result_and_elapsed_time(stock_session, monkeypatch)
 
 
 @pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (
+            '{"previous_close": 0.0001, "current_close": 12345678901234.5678}',
+            "12345678901234567700.0000",
+        ),
+        (
+            '{"previous_close": 0.0001, "current_close": 99999999999999.9999}',
+            "99999999999999999800.0000",
+        ),
+    ],
+)
+def test_json_numeric_prices_keep_decimal_precision(stock_session, raw: str, expected: str) -> None:
+    from app.tools import executor
+
+    record = executor.execute_tool("calculate_change", raw)
+
+    assert record.status == "success"
+    assert record.result == {"change_percent": expected}
+    assert record.arguments == raw
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"previous_close": 10, "current_close": 9.0000000000000001}',
+        '{"previous_close": 10.0000000000000001, "current_close": 9}',
+        '{"previous_close": 10, "current_close": 9.0000000000000001e0}',
+    ],
+)
+def test_overprecise_json_numbers_never_enter_calculation(stock_session, monkeypatch, raw: str):
+    from app.tools import executor
+
+    calls = []
+    monkeypatch.setattr(executor, "calculate_change", lambda value: calls.append(value))
+
+    record = executor.execute_tool("calculate_change", raw)
+
+    assert calls == []
+    assert record.status == "error"
+    assert record.result is None
+    assert record.error.kind == "invalid_arguments"
+    assert record.arguments == raw
+
+
+@pytest.mark.parametrize(
     "raw",
     [
         '{"previous_close": 0, "current_close": 9}',
