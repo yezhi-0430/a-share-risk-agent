@@ -1,4 +1,6 @@
-# Day 10：Function Calling（进行中）
+# Day 10：Function Calling（技术已验收，学习复盘中）
+
+截至 2026-10-08，三个工具、校验执行入口、日志和单轮模型工具选择均已实现；全套 215 个测试通过，真实千问已选择计算工具并由 Python 得到正确结果。下文保留各阶段的历史进度和验证证据。当前继续口头复盘，不据此标记为能独立编写完整 Agent。
 
 ## 今天的目标
 
@@ -21,6 +23,7 @@
 - 能判断合法 JSON 不能绕过工具白名单，未注册的 `delete_stock` 不能执行。
 - 能区分请求中发给模型的工具描述 `tools` 与模型响应中的调用请求 `tool_calls`。
 - 能判断 `content=None` 但有结构合法的调用请求时，应继续校验业务参数。
+- 最初不清楚空列表的循环次数；说明 `for` 逐个取元素、空列表不进入循环后，能判断两个调用请求会循环两次。空列表及异常退出仍需在后续新场景巩固。
 
 上述记录反映当前口头理解，不代表已能独立编写工具执行器或完整 Agent 循环。
 
@@ -173,3 +176,30 @@ HTTP 请求、10 秒超时、一次连接失败重试及鉴权/API 错误处理�
 实际运行后核验 `data/private/day10-tool-calls.jsonl` 最后两条：`offline_valid` 的计算结果为 `-10.0000`；`offline_rejected` 的零价格调用为 `invalid_arguments`，result 为 null。两者含对应调用编号和耗时。文件仍被 Git 忽略，历史演示记录保留；日志处理器仅挂在执行器上，避免其他模块的文本日志混入 JSONL。
 
 2026-10-08 最新全套 213 passed，2 条既有依赖警告；Ruff、相关文件格式与 diff 检查通过。离线单轮流程已连接，真实模型工具选择仍待验收；Day 10 不标记完成。
+
+## 第六阶段：真实工具选择验收
+
+`app/tool_calling_demo.py` 增加 `--provider fake|qwen`，默认 fake。显式 qwen 时，使用现有 Settings 与 `create_model_client` 创建千问客户端；默认 fake 会覆盖环境中的 provider，避免离线演示因本地配置改变而发出真实请求。没有修改 `.env`、模型地址或 API Key，也不打印密钥。
+
+两个新增演示测试先因尚未接入 HTTP 客户端失败，再通过：一条验证环境选 qwen 时默认演示仍无 HTTP 请求，并保存正常和拒绝记录；另一条用 MockTransport 验证显式 qwen 经过模型工厂、原生协议和 Python 执行，仅发出一轮请求并保存关联结果。相关演示、连接及工厂共 13 passed；本日共新增 113 个测试，全套最新为 215 passed，2 条既有依赖警告。Ruff、相关文件格式及 diff 检查通过。
+
+实际运行过一次真实验证命令：
+
+```powershell
+.\.venv\Scripts\python.exe -X utf8 -m app.tool_calling_demo --provider qwen
+```
+
+模型为本地配置的 `qwen-plus`。输入为虚构的昨日收盘价 10 元、今日收盘价 9 元；发送三个注册工具并保持 `tool_choice="auto"`。观察到的真实响应为文本空字符串与一个工具调用：
+
+```json
+{
+  "name": "calculate_change",
+  "arguments": "{\"current_close\": 9, \"previous_close\": 10}"
+}
+```
+
+执行器校验后调用 Python 计算函数，返回 `status="success"`、`result={"change_percent":"-10.0000"}`、`error=null`。已实际读取私有 JSONL 的最新记录，核对其调用编号与模型响应一致，名称、价格、结果正确，并有非负耗时。日志仍被 Git 忽略。本次真实样例覆盖计算工具；资料与日线工具由独立 SQLite 测试验证。
+
+技术验收结果：三个工具可用，错误参数在执行前拒绝并记录，成功/失败均有名称、原始参数、结果或错误、耗时，真实模型能提出计算请求并交给 Python 执行。没有第二轮模型请求或模型最终解释；工具结果回传与自动 Agent 循环属于 Day 11。
+
+学习状态：继续通过口头情景确认“模型选择、程序校验、Python 计算”的分工；基础理解不等于能独立实现全部代码。

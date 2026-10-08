@@ -20,7 +20,7 @@ Files: create `app/tool_calling.py`, `app/tool_calling_demo.py`, `tests/unit/tes
 - [x] Add standalone fake demo with valid and zero-price calls. Configure a UTF-8 JSONL handler only for executor records; print result and log path. Do not make model/network/database requests in this demo.
 - [x] Run targeted/full tests, Ruff and format checks; run demo and inspect persisted log.
 - [x] Update documentation and commit.
-- [ ] Explain the request-to-executor code and ask one question before real model verification.
+- [x] Explain the request-to-executor code and ask one question before real model verification.
 
 ## Execution Notes
 
@@ -31,3 +31,4 @@ Files: create `app/tool_calling.py`, `app/tool_calling_demo.py`, `tests/unit/tes
 - Ruff、相关文件格式与 diff 检查通过。
 - 已实际运行假模型演示并检查 JSONL 最后两条：合法计算成功，零价格拒绝，编号正确，私有文件仍被 Git 忽略。
 - 未请求真实模型；一轮受控执行结束，不自动回传工具结果或继续模型推理。
+- 教学：说明模型响应逐条进入执行器。用户最初不清楚空列表次数，举例后能判断两个请求循环两次；随后进入真实验证阶段。
