@@ -2,9 +2,9 @@ from datetime import date
 from decimal import Decimal
 
 from sqlalchemy import (
+    BigInteger,
     Date,
     ForeignKey,
-    Integer,
     Numeric,
     String,
     UniqueConstraint,
@@ -60,7 +60,7 @@ class DailyPrice(Base):
     high: Mapped[Decimal] = mapped_column(Numeric(18, 4))
     low: Mapped[Decimal] = mapped_column(Numeric(18, 4))
     close: Mapped[Decimal] = mapped_column(Numeric(18, 4))
-    volume: Mapped[int] = mapped_column(Integer)
+    volume: Mapped[int] = mapped_column(BigInteger)
 
 
 class WatchlistItem(Base):

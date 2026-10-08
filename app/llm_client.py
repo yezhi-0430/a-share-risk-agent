@@ -1,8 +1,10 @@
 from typing import Protocol
 
 import httpx
+from pydantic import ValidationError
 
 from app.config import Settings
+from app.llm_types import ToolReply
 
 
 class ModelTimeoutError(Exception):
@@ -34,13 +36,25 @@ class ModelConfigurationError(Exception):
 class ModelClient(Protocol):
     def chat(self, messages: list[dict[str, str]]) -> str: ...
 
+    def chat_with_tools(
+        self, messages: list[dict[str, str]], tools: list[dict[str, object]]
+    ) -> ToolReply: ...
+
 
 class FakeModelClient:
-    def __init__(self, reply: str) -> None:
+    def __init__(self, reply: str, tool_reply: ToolReply | None = None) -> None:
         self.reply = reply
+        self.tool_reply = tool_reply
 
     def chat(self, messages: list[dict[str, str]]) -> str:
         return self.reply
+
+    def chat_with_tools(
+        self, messages: list[dict[str, str]], tools: list[dict[str, object]]
+    ) -> ToolReply:
+        if self.tool_reply is not None:
+            return self.tool_reply
+        return ToolReply(content=self.reply)
 
 
 class QwenModelClient:
@@ -57,12 +71,36 @@ class QwenModelClient:
         self.chat_url = f"{base_url.rstrip('/')}/chat/completions"
 
     def chat(self, messages: list[dict[str, str]]) -> str:
+        message = self._request_message(messages)
+        try:
+            content = message["content"]
+        except KeyError as exc:
+            raise ModelResponseError("模型响应格式无效") from exc
+        if not isinstance(content, str):
+            raise ModelResponseError("模型回答不是文本")
+        return content
+
+    def chat_with_tools(
+        self, messages: list[dict[str, str]], tools: list[dict[str, object]]
+    ) -> ToolReply:
+        message = self._request_message(messages, tools)
+        try:
+            return ToolReply.model_validate(message)
+        except ValidationError as exc:
+            raise ModelResponseError("模型工具响应格式无效") from exc
+
+    def _request_message(
+        self, messages: list[dict[str, str]], tools: list[dict[str, object]] | None = None
+    ) -> dict[str, object]:
+        payload: dict[str, object] = {"model": self.model_name, "messages": messages}
+        if tools is not None:
+            payload.update({"tools": tools, "tool_choice": "auto"})
         for attempt in range(2):
             try:
                 response = self.http_client.post(
                     self.chat_url,
                     headers={"Authorization": f"Bearer {self.api_key}"},
-                    json={"model": self.model_name, "messages": messages},
+                    json=payload,
                     timeout=10.0,
                 )
                 break
@@ -77,21 +115,22 @@ class QwenModelClient:
         if response.is_error:
             raise ModelAPIError(response.status_code)
         try:
-            content = response.json()["choices"][0]["message"]["content"]
+            message = response.json()["choices"][0]["message"]
         except (ValueError, KeyError, IndexError, TypeError) as exc:
             raise ModelResponseError("模型响应格式无效") from exc
-        if not isinstance(content, str):
-            raise ModelResponseError("模型回答不是文本")
-        return content
+        if not isinstance(message, dict):
+            raise ModelResponseError("模型响应格式无效")
+        return message
 
 
 def create_model_client(
     settings: Settings,
     http_client: httpx.Client,
     fake_reply: str = "离线测试回答",
+    fake_tool_reply: ToolReply | None = None,
 ) -> ModelClient:
     if settings.model_provider == "fake":
-        return FakeModelClient(reply=fake_reply)
+        return FakeModelClient(reply=fake_reply, tool_reply=fake_tool_reply)
     if settings.dashscope_api_key is None:
         raise ModelConfigurationError("千问模式需要 DASHSCOPE_API_KEY")
     api_key = settings.dashscope_api_key.get_secret_value()
