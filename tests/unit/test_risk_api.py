@@ -45,3 +45,17 @@ def test_returns_valid_risk_summary() -> None:
 
     assert response.status_code == 200
     assert response.json() == expected
+
+
+def test_default_fake_provider_returns_valid_offline_summary(stock_session, monkeypatch) -> None:
+    monkeypatch.setenv("MODEL_PROVIDER", "fake")
+    application = FastAPI()
+    application.include_router(router)
+    with TestClient(application) as client:
+        response = client.post("/api/v1/risk-summary", json={"input_text": "昨日10元，今日9元"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["risk_level"] == "unknown"
+    assert body["facts"] == []
+    assert body["sources"] == []
+    assert any("离线" in value for value in body["unknowns"])

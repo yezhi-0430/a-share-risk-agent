@@ -1,15 +1,16 @@
 import logging
 from datetime import date
 from decimal import Decimal
-from typing import Annotated
+from typing import Annotated, Self
 
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import APIRouter, FastAPI, HTTPException, Request, status
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, Field, StringConstraints, model_validator
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.database import DailyPrice, SessionLocal, Stock
+from app.json_requests import DecimalJSONRoute
 from app.risk_api import router as risk_router
 from app.watchlists.repository import (
     DuplicateStockInWatchlistError,
@@ -29,16 +30,30 @@ class CreateWatchlistRequest(BaseModel):
 
 
 class AddStockRequest(BaseModel):
-    symbol: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+    symbol: Annotated[str, StringConstraints(strip_whitespace=True, to_upper=True, min_length=1)]
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+Price = Annotated[Decimal, Field(gt=0, allow_inf_nan=False, max_digits=18, decimal_places=4)]
+
 
 class DailyPriceRequest(BaseModel):
     trade_date: date
-    open: Decimal
-    high: Decimal
-    low: Decimal
-    close: Decimal
-    volume: int = Field(ge=0)
+    open: Price
+    high: Price
+    low: Price
+    close: Price
+    volume: int = Field(ge=0, le=9223372036854775807)
+
+    @model_validator(mode="after")
+    def validate_price_range(self) -> Self:
+        if self.low > self.high:
+            raise ValueError("最低价不能高于最高价")
+        if not self.low <= self.open <= self.high:
+            raise ValueError("开盘价必须在最低价和最高价之间")
+        if not self.low <= self.close <= self.high:
+            raise ValueError("收盘价必须在最低价和最高价之间")
+        return self
 
 
 def create_app() -> FastAPI:
@@ -47,6 +62,7 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
     application.include_router(risk_router)
+    price_router = APIRouter(route_class=DecimalJSONRoute)
 
     @application.exception_handler(Exception)
     async def handle_unexpected_error(
@@ -67,15 +83,13 @@ def create_app() -> FastAPI:
     async def get_stock(symbol: str) -> dict[str, str]:
         return {"symbol": symbol.upper()}
 
-    @application.post("/api/v1/stocks/{symbol}/daily-prices", status_code=201)
+    @price_router.post("/api/v1/stocks/{symbol}/daily-prices", status_code=201)
     def import_daily_price(
-    symbol: str,
-    payload: DailyPriceRequest,
+        symbol: str,
+        payload: DailyPriceRequest,
     ):
         with SessionLocal() as session:
-            stock = session.scalar(
-                select(Stock).where(Stock.symbol == symbol.upper())
-            )
+            stock = session.scalar(select(Stock).where(Stock.symbol == symbol.strip().upper()))
 
             if stock is None:
                 raise HTTPException(status_code=404, detail="股票不存在")
@@ -101,14 +115,14 @@ def create_app() -> FastAPI:
                     detail="该股票当天的日线数据已存在",
                 ) from exc
 
-        return {"symbol": symbol.upper()}
+        return {"symbol": symbol.strip().upper()}
+
+    application.include_router(price_router)
 
     @application.get("/api/v1/stocks/{symbol}/daily-prices")
     def get_daily_prices(symbol: str) -> list[dict[str, object]]:
         with SessionLocal() as session:
-            stock = session.scalar(
-                select(Stock).where(Stock.symbol == symbol.upper())
-            )
+            stock = session.scalar(select(Stock).where(Stock.symbol == symbol.strip().upper()))
 
             if stock is None:
                 raise HTTPException(status_code=404, detail="股票不存在")

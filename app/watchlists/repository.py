@@ -1,4 +1,5 @@
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.database import Stock, Watchlist, WatchlistItem
@@ -35,6 +36,7 @@ def add_stock_to_watchlist(
     symbol: str,
     name: str,
 ) -> Stock:
+    symbol = symbol.strip().upper()
     watchlist = session.get(Watchlist, watchlist_id)
     if watchlist is None:
         raise WatchlistNotFoundError
@@ -42,9 +44,15 @@ def add_stock_to_watchlist(
     stock_statement = select(Stock).where(Stock.symbol == symbol)
     stock = session.scalar(stock_statement)
     if stock is None:
-        stock = Stock(symbol=symbol, name=name)
-        session.add(stock)
-        session.flush()
+        try:
+            with session.begin_nested():
+                stock = Stock(symbol=symbol, name=name)
+                session.add(stock)
+                session.flush()
+        except IntegrityError:
+            stock = session.scalar(stock_statement)
+            if stock is None:
+                raise
 
     item_statement = select(WatchlistItem).where(
         WatchlistItem.watchlist_id == watchlist_id,
@@ -53,12 +61,14 @@ def add_stock_to_watchlist(
     if stock.id is not None and session.scalar(item_statement) is not None:
         raise DuplicateStockInWatchlistError
 
-    session.add(
-        WatchlistItem(
-            watchlist_id=watchlist_id,
-            stock_id=stock.id,
-        )
-    )
+    try:
+        with session.begin_nested():
+            session.add(WatchlistItem(watchlist_id=watchlist_id, stock_id=stock.id))
+            session.flush()
+    except IntegrityError as exc:
+        if session.scalar(item_statement) is not None:
+            raise DuplicateStockInWatchlistError from exc
+        raise
     session.commit()
     session.refresh(stock)
     return stock
@@ -69,6 +79,7 @@ def remove_stock_from_watchlist(
     watchlist_id: int,
     symbol: str,
 ) -> None:
+    symbol = symbol.strip().upper()
     watchlist = session.get(Watchlist, watchlist_id)
     if watchlist is None:
         raise WatchlistNotFoundError

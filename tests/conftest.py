@@ -25,7 +25,7 @@ def error_client() -> TestClient:
 
 
 @pytest.fixture(autouse=True)
-def clean_test_database():
+def clean_test_database(upgrade_test_schema):
     from app.database import Base, engine
 
     Base.metadata.create_all(engine)
@@ -39,3 +39,11 @@ def clean_test_database():
     clear_tables()
     yield
     clear_tables()
+
+
+@pytest.fixture(scope="session")
+def upgrade_test_schema():
+    from app.database import engine
+    from app.schema_upgrade import upgrade_database
+
+    upgrade_database(engine)
