@@ -20,6 +20,7 @@
 - 能判断开始日期 26 日、结束日期 24 日应拒绝调用，而不是查询后返回空列表。
 - 能判断合法 JSON 不能绕过工具白名单，未注册的 `delete_stock` 不能执行。
 - 能区分请求中发给模型的工具描述 `tools` 与模型响应中的调用请求 `tool_calls`。
+- 能判断 `content=None` 但有结构合法的调用请求时，应继续校验业务参数。
 
 上述记录反映当前口头理解，不代表已能独立编写工具执行器或完整 Agent 循环。
 
@@ -149,3 +150,26 @@ HTTP 请求、10 秒超时、一次连接失败重试及鉴权/API 错误处理�
 2026-10-08 最新全套为 205 passed，2 条既有依赖警告；全项目 Ruff、修改文件格式与 diff 空白检查通过。本阶段只用假模型和 MockTransport，没有请求真实模型。模型响应与工具执行器尚未连接，Day 10 继续进行；连接和真实调用状态将单独记录。
 
 协议参考：[阿里云 Function Calling 文档](https://help.aliyun.com/zh/model-studio/qwen-function-calling)。
+
+## 第五阶段之二：连接请求与执行入口
+
+`app/tool_calling.py` 的 `run_tool_turn(client, messages, session=None)` 先将注册表生成的三个工具定义发给模型，调用一次 `chat_with_tools`；再依次读取 `reply.tool_calls`，把工具名称和原始参数传给 `execute_tool`，收集每条成功或失败记录。返回 `ToolTurnResult`，包含模型响应 `reply` 和执行记录列表 `executions`。
+
+`ToolExecutionRecord` 增加可选 `tool_call_id`，模型请求中的 `call.id` 会传入执行器并写入返回结果及日志。直接调用执行器时可不提供，保留已有调用方式。此编号用于关联请求和记录，并不代替名称白名单和参数校验。
+
+- 模型只返回文本：调用列表为空，返回 `executions=[]`。
+- 一次响应包含多个调用：依次检查和执行，每条产生独立记录；某条参数失败不会阻止后续请求继续校验。
+- 模型服务失败：抛出已有模型异常，不开始执行工具。
+- 不把工具结果发回模型，不发起第二轮推理；该自动循环留在 Day 11。
+
+新增 `tests/unit/test_tool_calling.py` 的 8 个案例，先因空模块缺少功能失败，再全部通过。验证 MockTransport 原生请求携带三个注册工具并仅请求一次、成功计算和编号日志关联、零价格与破损 JSON 不进入计算、未注册名称不打开 Session、提供 Session 的资料查询、纯文本无执行、多请求顺序与失败后继续，以及模型超时无执行。连接、执行器、原生协议相关测试共 42 passed。
+
+演示 `app/tool_calling_demo.py` 使用预先配置的假模型请求，不发网络请求或执行数据库查询。运行：
+
+```powershell
+.\.venv\Scripts\python.exe -X utf8 -m app.tool_calling_demo
+```
+
+实际运行后核验 `data/private/day10-tool-calls.jsonl` 最后两条：`offline_valid` 的计算结果为 `-10.0000`；`offline_rejected` 的零价格调用为 `invalid_arguments`，result 为 null。两者含对应调用编号和耗时。文件仍被 Git 忽略，历史演示记录保留；日志处理器仅挂在执行器上，避免其他模块的文本日志混入 JSONL。
+
+2026-10-08 最新全套 213 passed，2 条既有依赖警告；Ruff、相关文件格式与 diff 检查通过。离线单轮流程已连接，真实模型工具选择仍待验收；Day 10 不标记完成。

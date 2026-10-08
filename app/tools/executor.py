@@ -28,6 +28,7 @@ class ToolExecutionError(BaseModel):
 
 
 class ToolExecutionRecord(BaseModel):
+    tool_call_id: str | None = None
     tool_name: str
     arguments: str
     status: Literal["success", "error"]
@@ -46,6 +47,8 @@ def execute_tool(
     tool_name: str,
     arguments: str,
     session: Session | None = None,
+    *,
+    tool_call_id: str | None = None,
 ) -> ToolExecutionRecord:
     started = perf_counter()
     result = None
@@ -84,6 +87,7 @@ def execute_tool(
             )
 
     record = ToolExecutionRecord(
+        tool_call_id=tool_call_id,
         tool_name=tool_name,
         arguments=arguments,
         status="error" if error else "success",

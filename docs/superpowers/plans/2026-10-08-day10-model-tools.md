@@ -19,7 +19,7 @@ Files: create `app/llm_types.py`, `tests/unit/test_tool_model_client.py`; update
 - [x] Add the new method to Protocol, FakeModelClient and QwenModelClient. Preserve old chat request shape and behavior. Add optional configured tool reply to factory for offline tests.
 - [x] Verify native request payload, tool/text responses, raw invalid argument preservation, malformed protocol rejection, timeout/auth/API/connection handling and offline factory behavior.
 - [x] Run targeted tests, full pytest, Ruff and changed-file format checks; update learning notes and commit.
-- [ ] Explain one short code section and ask one comprehension question before connecting the executor.
+- [x] Explain one short code section and ask one comprehension question before connecting the executor.
 
 ## Execution Notes
 
@@ -29,3 +29,4 @@ Files: create `app/llm_types.py`, `tests/unit/test_tool_model_client.py`; update
 - GREEN: 新旧客户端及工厂共 36 passed；全套 205 passed，2 条既有依赖警告。
 - Ruff、相关文件格式与 diff 检查通过；未请求真实模型。
 - 保持教学节奏：本段解释读取请求，下一段连接执行器。整天尚未完成。
+- 教学检查已完成：用户能判断有合法结构的工具请求时应继续校验业务参数；据此进入连接阶段。
