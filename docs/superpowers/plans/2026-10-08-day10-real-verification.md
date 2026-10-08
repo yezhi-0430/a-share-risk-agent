@@ -17,7 +17,7 @@ Files: update `app/tool_calling_demo.py`, README, Day 10 notes and previous teac
 - [x] Run targeted/full tests, Ruff and format checks.
 - [x] Run exactly one real verification command (connection retry remains existing client policy), inspect selected name/arguments/result and appended JSONL. Record success or failure honestly; do not repeat unchanged requests merely to get a preferred answer.
 - [x] Update evidence and learning notes; commit.
-- [ ] Explain the real result and complete the final comprehension check.
+- [x] Explain the real result and complete the final comprehension check.
 
 ## Teaching Notes
 
@@ -27,3 +27,4 @@ Files: update `app/tool_calling_demo.py`, README, Day 10 notes and previous teac
 - GREEN: 演示、连接和工厂共 13 passed；全套 215 passed，2 条既有依赖警告；Ruff、格式与 diff 检查通过。
 - 真实命令运行一次并成功：qwen-plus 选择 calculate_change，参数为昨日 10/今日 9，Python 返回 -10.0000；已核验追加 JSONL 的编号、参数、成功结果和耗时。
 - 技术目标已验收。继续最后口头分工检查，下一天的自动循环不在本阶段实现。
+- 最后问答已完成：用户回答“计算函数”，能判断真实样例的 -10.0000 由 Python 计算产生。本轮技术验收与基础问答完成；后续继续巩固循环及异常分支。
