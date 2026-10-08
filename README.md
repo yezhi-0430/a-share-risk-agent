@@ -8,7 +8,7 @@ Day 1–7 已完成后端、自选股管理和日线导入查询。Day 8 已加�
 
 Day 9 已加入风险摘要结构校验与接口，20 条模拟输出验收通过，并完成一次真实千问结构化输出验证。格式校验不验证事实真伪。
 
-Day 10 进行中：已实现 `calculate_change`、`get_stock_profile`、`get_daily_prices` 三个独立工具及参数校验。新增 69 个工具测试通过，全套测试 171 passed。统一执行入口、调用日志和模型选择工具尚待逐步完成。
+Day 10 进行中：已实现三个工具、统一执行入口和结构化调用记录，错误参数不会进入业务函数。新增 84 个工具测试通过，全套测试 186 passed。模型选择工具仍待接入。
 
 ## 项目原则
 
@@ -44,6 +44,14 @@ ruff check .
 模型客户端的配置、离线测试和手动验证方式见 [Day 8 学习记录](docs/day-08-model-api.md)。
 风险摘要的数据结构、接口与验证结果见 [Day 9 学习记录](docs/day-09-structured-output.md)。
 工具调用的学习进度与计算工具说明见 [Day 10 学习记录](docs/day-10-function-calling.md)。
+
+运行 Day 10 离线工具演示（Windows 使用 UTF-8 输出）：
+
+```powershell
+.\.venv\Scripts\python.exe -X utf8 -m app.tools.demo
+```
+
+演示计算 `10 → 9` 并拒绝 `0 → 9`；调用记录追加到 `data/private/day10-tool-calls.jsonl`。此演示不请求模型或数据库。
 
 ## 目录
 
