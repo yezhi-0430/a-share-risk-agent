@@ -100,4 +100,18 @@ for round_number in range(1, max_rounds + 1):
 
 已核验追加 JSONL 的调用 ID、参数、成功状态及 Python 结果。此证据验证一个虚构价格问题的两轮流程，不代表所有模型输出稳定或真实行情分析正确。未查询或写入真实行情、未修改密钥。
 
-Day 11 技术验收包含离线边界测试和一次真实两轮验证；基础口头复盘已完成。真实运行中 Python 计算与模型表述的分工仍需结合本次结果解释，独立编码能力仍未验证。
+Day 11 技术验收包含离线边界测试和一次真实两轮验证；基础口头复盘已完成。用户随后亲自运行真实演示，体验及基础编码练习见下文。
+
+## 用户真实调用体验与基础编码练习（2026-10-09）
+
+用户在 VS Code 终端运行 `app.agent_loop_demo --provider qwen` 并提供输出截图。截图显示 qwen-plus、`completed`、两轮、一次成功的 `calculate_change`、Python 结果 -10.0000 和最终文字“涨跌幅为 -10.0000%。”；已结合截图解释整体完成状态与单次工具成功状态，以及 Python 计算和模型组织回答的分工。这是用户亲自运行的额外一次调用，与上一节由助手执行的一次验证分开记录。
+
+用户暂停编码练习体验真实调用后，主动要求恢复练习：
+
+- 正向状态填空顺序正确，最初拼写为 `need_tools`，说明正确字段值为 `needs_tools`。
+- `if not reply.tool_calls` 的反向填空能正确回答 `completed`、`needs_tools`。
+- 独立尝试两行条件返回时写出 `if reply.tools_calls = None`，第二行为正确的 `return reply.content`。已说明属性拼写、赋值与判断、空列表与 None、条件末尾冒号的区别。
+- 改用 response 的练习中，仍混用 `reply.tool_calls` 和 `response.content`；已说明条件与返回应使用同一个响应对象。能判断响应中有工具请求时，`if not response.tool_calls` 内的 return 不执行。
+- 要求独立写 `history.extend(new_messages)` 时回答不知道；提供示例后，能在新的变量名场景中写出 `executions.extend(new_records)` 的方法与变量关系，但对 new_records 加了 Markdown 反引号，已说明实际 Python 代码需去掉反引号。
+
+本轮结果表明，概念判断比独立写出语法更熟悉；基础编码仍需提示。后续优先练习属性名称、变量一致性、if/return 语法及 append/extend 的区别，不标记为能独立实现完整 Agent。本轮归档仅修改文档，未更改业务代码或重复请求模型。
