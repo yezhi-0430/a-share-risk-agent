@@ -1,3 +1,5 @@
+from collections.abc import Mapping, Sequence
+
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -14,7 +16,7 @@ class ToolTurnResult(BaseModel):
 
 def run_tool_turn(
     client: ModelClient,
-    messages: list[dict[str, str]],
+    messages: Sequence[Mapping[str, object]],
     session: Session | None = None,
 ) -> ToolTurnResult:
     reply = client.chat_with_tools(messages, tool_definitions())

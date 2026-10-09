@@ -1,3 +1,4 @@
+from collections.abc import Mapping, Sequence
 from typing import Protocol
 
 import httpx
@@ -34,10 +35,10 @@ class ModelConfigurationError(Exception):
 
 
 class ModelClient(Protocol):
-    def chat(self, messages: list[dict[str, str]]) -> str: ...
+    def chat(self, messages: Sequence[Mapping[str, object]]) -> str: ...
 
     def chat_with_tools(
-        self, messages: list[dict[str, str]], tools: list[dict[str, object]]
+        self, messages: Sequence[Mapping[str, object]], tools: list[dict[str, object]]
     ) -> ToolReply: ...
 
 
@@ -46,11 +47,11 @@ class FakeModelClient:
         self.reply = reply
         self.tool_reply = tool_reply
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
+    def chat(self, messages: Sequence[Mapping[str, object]]) -> str:
         return self.reply
 
     def chat_with_tools(
-        self, messages: list[dict[str, str]], tools: list[dict[str, object]]
+        self, messages: Sequence[Mapping[str, object]], tools: list[dict[str, object]]
     ) -> ToolReply:
         if self.tool_reply is not None:
             return self.tool_reply
@@ -70,7 +71,7 @@ class QwenModelClient:
         self.model_name = model_name
         self.chat_url = f"{base_url.rstrip('/')}/chat/completions"
 
-    def chat(self, messages: list[dict[str, str]]) -> str:
+    def chat(self, messages: Sequence[Mapping[str, object]]) -> str:
         message = self._request_message(messages)
         try:
             content = message["content"]
@@ -81,7 +82,7 @@ class QwenModelClient:
         return content
 
     def chat_with_tools(
-        self, messages: list[dict[str, str]], tools: list[dict[str, object]]
+        self, messages: Sequence[Mapping[str, object]], tools: list[dict[str, object]]
     ) -> ToolReply:
         message = self._request_message(messages, tools)
         try:
@@ -90,7 +91,7 @@ class QwenModelClient:
             raise ModelResponseError("模型工具响应格式无效") from exc
 
     def _request_message(
-        self, messages: list[dict[str, str]], tools: list[dict[str, object]] | None = None
+        self, messages: Sequence[Mapping[str, object]], tools: list[dict[str, object]] | None = None
     ) -> dict[str, object]:
         payload: dict[str, object] = {"model": self.model_name, "messages": messages}
         if tools is not None:
